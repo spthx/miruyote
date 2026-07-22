@@ -1,0 +1,11 @@
+{
+  "name": "ミルヨテ — 俺専用アニメナビ",
+  "short_name": "ミルヨテ",
+  "description": "今期アニメの次回予定を追いかける個人用ナビ",
+  "start_url": "./#today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080d1a",
+  "theme_color": "#0b1020",
+  "lang": "ja"
+}

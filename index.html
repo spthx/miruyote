@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="description" content="自分の視聴環境に合わせて今期アニメを追いかける、個人用アニメナビ。" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>ミルヨテ — 俺専用アニメナビ</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#today" aria-label="ミルヨテ ホーム">
+          <span class="brand-mark">ミ</span>
+          <span><strong>ミルヨテ</strong><small>俺専用アニメナビ</small></span>
+        </a>
+        <button id="refreshButton" class="icon-button" type="button" aria-label="番組情報を更新" title="番組情報を更新">↻</button>
+      </header>
+
+      <main>
+        <section id="todayView" class="view active" aria-labelledby="todayTitle">
+          <div class="hero">
+            <div>
+              <p class="eyebrow" id="todayDate">TODAY</p>
+              <h1 id="todayTitle">次に観られる一本。</h1>
+              <p class="hero-copy">気になる作品だけ選んで、次回予定をカレンダーへ。</p>
+            </div>
+            <div class="hero-orbit" aria-hidden="true"><span></span><b>▶</b></div>
+          </div>
+
+          <div id="nextUp" class="next-up"></div>
+
+          <div class="section-heading">
+            <div><p class="eyebrow">UP NEXT</p><h2>これからの予定</h2></div>
+            <button id="exportCalendarTop" class="text-button" type="button">カレンダーに追加</button>
+          </div>
+          <div id="scheduleList" class="schedule-list" aria-live="polite"></div>
+        </section>
+
+        <section id="lineupView" class="view" aria-labelledby="lineupTitle">
+          <div class="section-heading lineup-heading">
+            <div><p class="eyebrow">SUMMER 2026</p><h1 id="lineupTitle">今期ラインナップ</h1></div>
+            <span id="lineupCount" class="count-pill">–</span>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" placeholder="作品名で検索" autocomplete="off" />
+          </label>
+          <div class="filter-row" role="group" aria-label="作品の絞り込み">
+            <button class="filter-chip active" type="button" data-filter="all">すべて</button>
+            <button class="filter-chip" type="button" data-filter="favorite">観たい</button>
+            <button class="filter-chip" type="button" data-filter="airing">放送中</button>
+          </div>
+          <div id="lineupGrid" class="lineup-grid" aria-live="polite"></div>
+        </section>
+
+        <section id="settingsView" class="view" aria-labelledby="settingsTitle">
+          <div class="section-heading settings-heading">
+            <div><p class="eyebrow">MY SETUP</p><h1 id="settingsTitle">視聴環境</h1></div>
+            <span class="privacy-badge">この端末だけ</span>
+          </div>
+          <p class="settings-intro">ここで選んだ内容はGitHubへ送信されず、このブラウザ内だけに保存されます。</p>
+
+          <div class="settings-card">
+            <label class="field-label" for="prefectureSelect">都道府県</label>
+            <select id="prefectureSelect">
+              <option value="">選択してください</option>
+              <option>東京都</option><option>神奈川県</option><option>千葉県</option><option>埼玉県</option>
+              <option>愛知県</option><option>大阪府</option><option>京都府</option><option>兵庫県</option>
+              <option>北海道</option><option>福岡県</option><option value="その他">その他</option>
+            </select>
+          </div>
+
+          <div class="settings-card">
+            <div class="field-heading"><span>視聴できる局</span><small>複数選択可</small></div>
+            <div id="channelOptions" class="check-grid"></div>
+          </div>
+
+          <div class="settings-card">
+            <div class="field-heading"><span>加入サービス</span><small>複数選択可</small></div>
+            <div id="serviceOptions" class="check-grid"></div>
+          </div>
+
+          <div class="settings-card calendar-card">
+            <div><span class="calendar-icon" aria-hidden="true">17</span></div>
+            <div><h2>端末のカレンダーで通知</h2><p>「観たい」にした作品の次回予定を、10分前アラーム付きICSに書き出します。</p></div>
+            <button id="exportCalendarSettings" class="primary-button" type="button">ICSを書き出す</button>
+          </div>
+
+          <details class="data-note">
+            <summary>データについて</summary>
+            <p>作品・次回放送情報はAniList APIを参照します。地域別放送・配信時刻は完全自動ではないため、作品カードから自分用予定を補正できます。時刻変更は必ず公式情報も確認してください。</p>
+          </details>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="メインメニュー">
+        <a href="#today" class="active" data-view="today"><span>◷</span>今日</a>
+        <a href="#lineup" data-view="lineup"><span>▦</span>今期</a>
+        <a href="#settings" data-view="settings"><span>⚙</span>設定</a>
+      </nav>
+    </div>
+
+    <dialog id="overrideDialog">
+      <form id="overrideForm" method="dialog">
+        <button class="dialog-close" value="cancel" aria-label="閉じる">×</button>
+        <p class="eyebrow">MANUAL CORRECTION</p>
+        <h2 id="overrideTitle">自分用予定を補正</h2>
+        <p class="dialog-copy">公式サイトで確認した最速時刻を、この端末だけに保存します。</p>
+        <input id="overrideAnimeId" type="hidden" />
+        <label class="field-label" for="overrideProvider">視聴先</label>
+        <input id="overrideProvider" type="text" placeholder="例：DMM TV / BS11" required />
+        <label class="field-label" for="overrideDateTime">開始日時</label>
+        <input id="overrideDateTime" type="datetime-local" required />
+        <div class="dialog-actions">
+          <button id="deleteOverride" class="danger-button" type="button">補正を削除</button>
+          <button class="primary-button" value="save">保存する</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
