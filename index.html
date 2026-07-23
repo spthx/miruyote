@@ -90,6 +90,19 @@
             <button id="exportCalendarSettings" class="primary-button" type="button">ICSを書き出す</button>
           </div>
 
+          <div class="settings-card calendar-card subscription-card">
+            <div><span class="calendar-icon" aria-hidden="true">⟳</span></div>
+            <div>
+              <h2>カレンダー購読（重複しにくい方式）</h2>
+              <p>下のボタンで <code>calendar.ics</code> を書き出し、リポジトリ直下に置いてpushしてください。その後、購読URLをカレンダーアプリの「URLで購読」に登録すると、次回以降は書き出したファイルをpushするだけで内容が置き換わり、重複登録されません。「観たい」を変更したら、この書き出し→push を繰り返してください。</p>
+              <p class="subscription-url" id="subscriptionUrlDisplay"></p>
+            </div>
+            <div class="subscription-actions">
+              <button id="exportSubscriptionFeed" class="primary-button" type="button">calendar.ics を書き出す</button>
+              <button id="copySubscriptionUrl" class="mini-button" type="button">購読URLをコピー</button>
+            </div>
+          </div>
+
           <details class="data-note">
             <summary>データについて</summary>
             <p>作品・次回放送情報はAniList APIを参照します。地域別放送・配信時刻は完全自動ではないため、作品カードから自分用予定を補正できます。時刻変更は必ず公式情報も確認してください。</p>

@@ -131,6 +131,8 @@ function renderSettings() {
   document.querySelector("#prefectureSelect").value = state.prefecture;
   renderChecks("#channelOptions", channels, state.channels, "channel");
   renderChecks("#serviceOptions", services, state.services, "service");
+  const urlNode = document.querySelector("#subscriptionUrlDisplay");
+  if (urlNode) urlNode.textContent = `購読URL: webcal://${location.host}${location.pathname.replace(/index\.html$/, "")}calendar.ics`;
 }
 
 function renderChecks(selector, values, selected, name) {
@@ -211,16 +213,32 @@ function saveOverride() {
 function escapeICS(value) { return String(value).replaceAll("\\", "\\\\").replaceAll(";", "\\;").replaceAll(",", "\\,").replaceAll("\n", "\\n"); }
 function icsDate(date) { return date.toISOString().replaceAll("-", "").replaceAll(":", "").replace(/\.\d{3}/, ""); }
 
-function exportICS(items = upcomingItems(true)) {
-  if (!items.length) { showToast("先に観たい作品を登録してください"); return; }
+function buildICSContent(items) {
   const events = items.map(({ item, schedule }) => {
     const end = new Date(schedule.at.getTime() + 30 * 60 * 1000);
     return ["BEGIN:VEVENT", `UID:miruyote-${item.id}-${schedule.episode || 0}@local`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(schedule.at)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${escapeICS(`${titleOf(item)} 第${schedule.episode || "?"}話`)}`, `DESCRIPTION:${escapeICS(`${schedule.provider} / ${schedule.confirmed ? "自分用確認済み" : "AniList参考時刻。公式情報も確認してください。"}`)}`, "BEGIN:VALARM", "TRIGGER:-PT10M", "ACTION:DISPLAY", `DESCRIPTION:${escapeICS(`${titleOf(item)} まもなく開始`)}`, "END:VALARM", "END:VEVENT"].join("\r\n");
   }).join("\r\n");
-  const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Miruyote//Anime Schedule//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", events, "END:VCALENDAR"].join("\r\n");
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Miruyote//Anime Schedule//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:ミルヨテ", "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H", events, "END:VCALENDAR"].join("\r\n");
+}
+
+function exportICS(items = upcomingItems(true), filename = "miruyote.ics") {
+  if (!items.length) { showToast("先に観たい作品を登録してください"); return; }
+  const content = buildICSContent(items);
   const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "miruyote.ics"; link.click(); URL.revokeObjectURL(link.href);
+  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href);
   showToast(`${items.length}件の予定を書き出しました`);
+}
+
+function exportSubscriptionFeed() {
+  const items = upcomingItems(true);
+  if (!items.length) { showToast("先に観たい作品を登録してください"); return; }
+  exportICS(items, "calendar.ics");
+  showToast("calendar.ics を書き出しました。リポジトリ直下に置いてpushしてください");
+}
+
+function copySubscriptionUrl() {
+  const url = `webcal://${location.host}${location.pathname.replace(/index\.html$/, "")}calendar.ics`;
+  navigator.clipboard?.writeText(url).then(() => showToast("購読URLをコピーしました")).catch(() => showToast(url));
 }
 
 function showToast(message) {
@@ -262,6 +280,8 @@ document.querySelector("#deleteOverride").addEventListener("click", () => { cons
 document.querySelector("#refreshButton").addEventListener("click", () => fetchAnime(true));
 document.querySelector("#exportCalendarTop").addEventListener("click", () => exportICS());
 document.querySelector("#exportCalendarSettings").addEventListener("click", () => exportICS());
+document.querySelector("#exportSubscriptionFeed")?.addEventListener("click", exportSubscriptionFeed);
+document.querySelector("#copySubscriptionUrl")?.addEventListener("click", copySubscriptionUrl);
 window.addEventListener("hashchange", navigate);
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
