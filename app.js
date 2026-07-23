@@ -9,6 +9,8 @@ const fallbackAnime = [
 
 let anime = [];
 let activeFilter = "all";
+let lineupPage = 1;
+const LINEUP_PAGE_SIZE = 50;
 let state = loadState();
 
 function loadState() {
@@ -95,8 +97,14 @@ function renderLineup() {
     if (activeFilter === "airing" && item.status !== "RELEASING") return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LINEUP_PAGE_SIZE));
+  if (lineupPage > totalPages) lineupPage = totalPages;
+  if (lineupPage < 1) lineupPage = 1;
+  const start = (lineupPage - 1) * LINEUP_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + LINEUP_PAGE_SIZE);
+
   document.querySelector("#lineupCount").textContent = `${filtered.length}作品`;
-  document.querySelector("#lineupGrid").innerHTML = filtered.length ? filtered.map(item => {
+  document.querySelector("#lineupGrid").innerHTML = pageItems.length ? pageItems.map(item => {
     const schedule = scheduleOf(item);
     const favorite = state.favorites.includes(item.id);
     const bg = item.coverImage?.large ? `style="background-image:url('${item.coverImage.large.replaceAll("'", "%27")}')"` : "";
@@ -108,6 +116,15 @@ function renderLineup() {
       </div>
     </article>`;
   }).join("") : `<div class="empty-state">条件に合う作品がありません。</div>`;
+
+  const paginationNode = document.querySelector("#lineupPagination");
+  if (paginationNode) {
+    paginationNode.innerHTML = totalPages > 1 ? `
+      <button class="mini-button" type="button" data-page-action="prev" ${lineupPage <= 1 ? "disabled" : ""}>← 前の50件</button>
+      <span class="page-indicator">${lineupPage} / ${totalPages} ページ</span>
+      <button class="mini-button" type="button" data-page-action="next" ${lineupPage >= totalPages ? "disabled" : ""}>次の50件 →</button>
+    ` : "";
+  }
 }
 
 function renderSettings() {
@@ -131,12 +148,23 @@ async function fetchAnime(force = false) {
     } catch {}
   }
   if (!anime.length || force) {
-    const query = `query { Page(page: 1, perPage: 50) { media(type: ANIME, season: SUMMER, seasonYear: 2026, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
+    const query = `query ($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(type: ANIME, season: SUMMER, seasonYear: 2026, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
+    const TARGET_TOTAL = 200;
+    const PER_PAGE = 50;
     try {
-      const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query }) });
-      if (!response.ok) throw new Error(`API ${response.status}`);
-      const json = await response.json();
-      anime = json.data.Page.media;
+      const collected = [];
+      let page = 1;
+      let hasNextPage = true;
+      while (hasNextPage && collected.length < TARGET_TOTAL) {
+        const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query, variables: { page, perPage: PER_PAGE } }) });
+        if (!response.ok) throw new Error(`API ${response.status}`);
+        const json = await response.json();
+        collected.push(...json.data.Page.media);
+        hasNextPage = json.data.Page.pageInfo?.hasNextPage;
+        page += 1;
+        if (hasNextPage && collected.length < TARGET_TOTAL) await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      anime = collected.slice(0, TARGET_TOTAL);
       localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items: anime }));
       if (force) showToast("番組情報を更新しました");
     } catch (error) {
@@ -214,8 +242,15 @@ document.addEventListener("click", event => {
   if (action === "override") openOverride(id);
   if (action === "single-ics") { const item = anime.find(value => value.id === id); if (item && scheduleOf(item)) exportICS([{ item, schedule: scheduleOf(item) }]); }
 });
-document.querySelector("#searchInput").addEventListener("input", renderLineup);
-document.querySelectorAll(".filter-chip").forEach(button => button.addEventListener("click", () => { document.querySelectorAll(".filter-chip").forEach(node => node.classList.remove("active")); button.classList.add("active"); activeFilter = button.dataset.filter; renderLineup(); }));
+document.querySelector("#searchInput").addEventListener("input", () => { lineupPage = 1; renderLineup(); });
+document.querySelectorAll(".filter-chip").forEach(button => button.addEventListener("click", () => { document.querySelectorAll(".filter-chip").forEach(node => node.classList.remove("active")); button.classList.add("active"); activeFilter = button.dataset.filter; lineupPage = 1; renderLineup(); }));
+document.querySelector("#lineupView").addEventListener("click", event => {
+  const pageAction = event.target.closest("[data-page-action]")?.dataset.pageAction;
+  if (!pageAction) return;
+  lineupPage += pageAction === "next" ? 1 : -1;
+  renderLineup();
+  document.querySelector("#lineupView").scrollIntoView({ block: "start" });
+});
 document.querySelector("#prefectureSelect").addEventListener("change", event => { state.prefecture = event.target.value; saveState(); showToast("都道府県を保存しました"); });
 document.querySelector("#settingsView").addEventListener("change", event => {
   if (!event.target.matches("input[type=checkbox]")) return;

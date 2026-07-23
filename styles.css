@@ -85,6 +85,9 @@ h1, h2, p { margin-top: 0; }
 .favorite-button.active { color: #0b1020; background: var(--accent); border-color: var(--accent); }
 .card-actions { display: flex; gap: 7px; }
 .card-actions button, .card-actions a { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.04); color: var(--text); text-align: center; text-decoration: none; cursor: pointer; font-size: 10px; }
+.lineup-pagination { margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 16px; }
+.lineup-pagination .mini-button:disabled { opacity: .35; cursor: default; }
+.page-indicator { color: var(--muted); font-size: 12px; font-weight: 700; }
 .settings-intro { max-width: 650px; margin-bottom: 24px; }
 .settings-card { margin-bottom: 14px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .field-label, .field-heading { display: block; margin-bottom: 12px; font-size: 13px; font-weight: 750; }
