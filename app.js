@@ -1,6 +1,8 @@
 const API_URL = "https://graphql.anilist.co";
 const STORAGE_KEY = "miruyote-state-v1";
-const CACHE_KEY = "miruyote-anilist-cache-v1";
+const ACTIVE_SEASON = currentAnimeSeason();
+const CACHE_KEY = `miruyote-anilist-cache-v1-${ACTIVE_SEASON.year}-${ACTIVE_SEASON.season}`;
+const SEASON_LABELS = { WINTER: "WINTER", SPRING: "SPRING", SUMMER: "SUMMER", FALL: "FALL" };
 const channels = ["TOKYO MX", "テレビ愛知", "MBS", "ABCテレビ", "BS11", "BS日テレ", "AT-X", "その他"];
 const services = ["dアニメストア", "DMM TV", "ABEMA", "Netflix", "Prime Video", "U-NEXT", "Disney+", "Hulu"];
 const fallbackAnime = [
@@ -13,16 +15,50 @@ let lineupPage = 1;
 const LINEUP_PAGE_SIZE = 50;
 let state = loadState();
 
+function currentAnimeSeason(date = new Date()) {
+  const month = date.getMonth() + 1;
+  const season = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
+  return { season, year: date.getFullYear() };
+}
+
+function normalizeState(input = {}) {
+  const favoriteIds = Array.isArray(input.favorites) ? input.favorites.map(Number).filter(Number.isFinite) : [];
+  const overrides = input.overrides && typeof input.overrides === "object" && !Array.isArray(input.overrides) ? input.overrides : {};
+  return {
+    favorites: [...new Set(favoriteIds)],
+    prefecture: typeof input.prefecture === "string" ? input.prefecture : "",
+    channels: Array.isArray(input.channels) ? input.channels.filter(value => typeof value === "string") : [],
+    services: Array.isArray(input.services) ? input.services.filter(value => typeof value === "string") : [],
+    overrides
+  };
+}
+
 function loadState() {
   try {
-    return { favorites: [], prefecture: "", channels: [], services: [], overrides: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
+    return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"));
   } catch {
-    return { favorites: [], prefecture: "", channels: [], services: [], overrides: {} };
+    return normalizeState();
   }
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    showToast("端末への保存に失敗しました。設定バックアップを作成してください");
+    return false;
+  }
+}
+
+async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted?.()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
 }
 
 function titleOf(item) {
@@ -34,6 +70,15 @@ function scheduleOf(item) {
   if (override) return { at: new Date(override.startAt), episode: override.episode || item.nextAiringEpisode?.episode, provider: override.provider, confirmed: true };
   if (!item.nextAiringEpisode) return null;
   return { at: new Date(item.nextAiringEpisode.airingAt * 1000), episode: item.nextAiringEpisode.episode, provider: "AniList公開予定", confirmed: false };
+}
+
+function compareLineup(a, b) {
+  const favoriteDifference = Number(state.favorites.includes(b.id)) - Number(state.favorites.includes(a.id));
+  if (favoriteDifference) return favoriteDifference;
+  const aTime = scheduleOf(a)?.at?.getTime() ?? Number.POSITIVE_INFINITY;
+  const bTime = scheduleOf(b)?.at?.getTime() ?? Number.POSITIVE_INFINITY;
+  if (aTime !== bTime) return aTime - bTime;
+  return titleOf(a).localeCompare(titleOf(b), "ja");
 }
 
 function upcomingItems(onlyFavorites = true) {
@@ -96,7 +141,7 @@ function renderLineup() {
     if (activeFilter === "favorite" && !state.favorites.includes(item.id)) return false;
     if (activeFilter === "airing" && item.status !== "RELEASING") return false;
     return true;
-  });
+  }).sort(compareLineup);
   const totalPages = Math.max(1, Math.ceil(filtered.length / LINEUP_PAGE_SIZE));
   if (lineupPage > totalPages) lineupPage = totalPages;
   if (lineupPage < 1) lineupPage = 1;
@@ -104,6 +149,8 @@ function renderLineup() {
   const pageItems = filtered.slice(start, start + LINEUP_PAGE_SIZE);
 
   document.querySelector("#lineupCount").textContent = `${filtered.length}作品`;
+  const seasonLabel = document.querySelector("#seasonLabel");
+  if (seasonLabel) seasonLabel.textContent = `${SEASON_LABELS[ACTIVE_SEASON.season]} ${ACTIVE_SEASON.year}`;
   document.querySelector("#lineupGrid").innerHTML = pageItems.length ? pageItems.map(item => {
     const schedule = scheduleOf(item);
     const favorite = state.favorites.includes(item.id);
@@ -135,6 +182,8 @@ function renderSettings() {
   if (urlNode) urlNode.textContent = `購読URL: webcal://${location.host}${location.pathname.replace(/index\.html$/, "")}calendar.ics`;
   const calendarStatus = document.querySelector("#calendarStatus");
   if (calendarStatus) calendarStatus.textContent = state.favorites.length ? `現在「観たい」${state.favorites.length}作品` : "先に「今期」で観たい作品へ★を付けてください";
+  const storageStatus = document.querySelector("#storageStatus");
+  if (storageStatus) storageStatus.textContent = `保存済み：お気に入り${state.favorites.length}作品・時刻補正${Object.keys(state.overrides).length}件`;
 }
 
 function renderChecks(selector, values, selected, name) {
@@ -152,7 +201,7 @@ async function fetchAnime(force = false) {
     } catch {}
   }
   if (!anime.length || force) {
-    const query = `query ($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(type: ANIME, season: SUMMER, seasonYear: 2026, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
+    const query = `query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(type: ANIME, season: $season, seasonYear: $seasonYear, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
     const TARGET_TOTAL = 200;
     const PER_PAGE = 50;
     try {
@@ -160,7 +209,7 @@ async function fetchAnime(force = false) {
       let page = 1;
       let hasNextPage = true;
       while (hasNextPage && collected.length < TARGET_TOTAL) {
-        const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query, variables: { page, perPage: PER_PAGE } }) });
+        const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query, variables: { page, perPage: PER_PAGE, season: ACTIVE_SEASON.season, seasonYear: ACTIVE_SEASON.year } }) });
         if (!response.ok) throw new Error(`API ${response.status}`);
         const json = await response.json();
         collected.push(...json.data.Page.media);
@@ -183,7 +232,11 @@ async function fetchAnime(force = false) {
 
 function toggleFavorite(id) {
   state.favorites = state.favorites.includes(id) ? state.favorites.filter(value => value !== id) : [...state.favorites, id];
-  saveState(); renderAll(); showToast(state.favorites.includes(id) ? "「観たい」に追加しました" : "「観たい」から外しました");
+  lineupPage = 1;
+  saveState();
+  requestPersistentStorage();
+  renderAll();
+  showToast(state.favorites.includes(id) ? "「観たい」に追加し、一覧の先頭へ移動しました" : "「観たい」から外しました");
 }
 
 function openOverride(id) {
@@ -219,7 +272,10 @@ function saveOverride() {
   const item = anime.find(value => value.id === id);
   state.overrides[id] = { provider, startAt: new Date(startAt).toISOString(), episode: item?.nextAiringEpisode?.episode || null };
   if (!state.favorites.includes(id)) state.favorites.push(id);
-  saveState(); renderAll(); showToast("自分用予定を保存しました"); return true;
+  lineupPage = 1;
+  saveState();
+  requestPersistentStorage();
+  renderAll(); showToast("自分用予定を保存しました"); return true;
 }
 
 function escapeICS(value) { return String(value).replaceAll("\\", "\\\\").replaceAll(";", "\\;").replaceAll(",", "\\,").replaceAll("\n", "\\n"); }
@@ -233,7 +289,7 @@ function buildICSContent(items) {
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Miruyote//Anime Schedule//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:ミルヨテ", "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H", events, "END:VCALENDAR"].join("\r\n");
 }
 
-function downloadICSFile(file) {
+function downloadFile(file) {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
@@ -266,7 +322,7 @@ async function exportICS(items = upcomingItems(true), filename = "miruyote.ics")
       }
     }
   }
-  downloadICSFile(file);
+  downloadFile(file);
   showToast(`${items.length}件のICSを保存しました。ファイルを開いて登録してください`);
 }
 
@@ -298,6 +354,48 @@ async function copySubscriptionUrl() {
     const copied = document.execCommand("copy");
     field.remove();
     showToast(copied ? "購読URLをコピーしました" : url);
+  }
+}
+
+async function exportSettingsBackup() {
+  const payload = { version: 1, exportedAt: new Date().toISOString(), data: state };
+  const day = new Date().toISOString().slice(0, 10);
+  const file = new File([JSON.stringify(payload, null, 2)], `miruyote-backup-${day}.json`, { type: "application/json" });
+  const shareData = { title: "ミルヨテ設定バックアップ", files: [file] };
+  if (navigator.share && navigator.canShare?.(shareData)) {
+    try {
+      await navigator.share(shareData);
+      showToast("設定バックアップを共有しました");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        showToast("共有をキャンセルしました");
+        return;
+      }
+    }
+  }
+  downloadFile(file);
+  showToast("設定バックアップを保存しました");
+}
+
+async function importSettingsBackup(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const previousState = state;
+  try {
+    const payload = JSON.parse(await file.text());
+    const importedState = normalizeState(payload?.data ?? payload);
+    state = importedState;
+    if (!saveState()) throw new Error("Storage unavailable");
+    await requestPersistentStorage();
+    lineupPage = 1;
+    renderAll();
+    showToast(`お気に入り${state.favorites.length}作品を含む設定を復元しました`);
+  } catch {
+    state = previousState;
+    showToast("バックアップを読み込めませんでした");
+  } finally {
+    event.target.value = "";
   }
 }
 
@@ -348,6 +446,8 @@ document.querySelector("#exportCalendarTop").addEventListener("click", () => exp
 document.querySelector("#exportCalendarSettings").addEventListener("click", () => exportICS());
 document.querySelector("#exportSubscriptionFeed")?.addEventListener("click", exportSubscriptionFeed);
 document.querySelector("#copySubscriptionUrl")?.addEventListener("click", copySubscriptionUrl);
+document.querySelector("#exportSettingsBackup")?.addEventListener("click", exportSettingsBackup);
+document.querySelector("#importSettingsInput")?.addEventListener("change", importSettingsBackup);
 window.addEventListener("hashchange", navigate);
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
