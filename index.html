@@ -44,7 +44,7 @@
 
         <section id="lineupView" class="view" aria-labelledby="lineupTitle">
           <div class="section-heading lineup-heading">
-            <div><p class="eyebrow">SUMMER 2026</p><h1 id="lineupTitle">今期ラインナップ</h1></div>
+            <div><p class="eyebrow" id="seasonLabel">CURRENT SEASON</p><h1 id="lineupTitle">今期ラインナップ</h1></div>
             <span id="lineupCount" class="count-pill">–</span>
           </div>
           <label class="search-box">
@@ -56,6 +56,7 @@
             <button class="filter-chip" type="button" data-filter="favorite">観たい</button>
             <button class="filter-chip" type="button" data-filter="airing">放送中</button>
           </div>
+          <p class="lineup-note">★を付けた作品はこの端末に記憶され、次回から一覧の先頭に並びます。</p>
           <div id="lineupGrid" class="lineup-grid" aria-live="polite"></div>
           <div id="lineupPagination" class="lineup-pagination" aria-live="polite"></div>
         </section>
@@ -85,6 +86,17 @@
           <div class="settings-card">
             <div class="field-heading"><span>加入サービス</span><small>複数選択可</small></div>
             <div id="serviceOptions" class="check-grid"></div>
+          </div>
+
+          <div class="settings-card backup-card">
+            <div class="field-heading"><span>お気に入りと設定の保護</span><small>機種変更・データ消去に備える</small></div>
+            <p id="storageStatus" class="storage-status" aria-live="polite"></p>
+            <p>通常はこの端末に自動保存されます。念のためバックアップを作ると、Safariのデータ消去や機種変更後にも復元できます。</p>
+            <div class="backup-actions">
+              <button id="exportSettingsBackup" class="primary-button" type="button">バックアップを作る</button>
+              <label class="mini-button import-button" for="importSettingsInput">バックアップを読み込む</label>
+              <input id="importSettingsInput" type="file" accept="application/json,.json" hidden />
+            </div>
           </div>
 
           <div class="settings-card calendar-card">
