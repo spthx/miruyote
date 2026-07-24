@@ -18,7 +18,7 @@ body { margin: 0; min-width: 320px; color: var(--text); background:
   radial-gradient(circle at 90% -5%, rgba(123,220,255,.12), transparent 28rem),
   radial-gradient(circle at -10% 25%, rgba(185,255,79,.08), transparent 24rem), var(--bg); }
 button, input, select { font: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
+button, a, label { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 button { color: inherit; }
 .app-shell { width: min(100%, 1120px); min-height: 100vh; margin: auto; padding: 0 24px 110px; }
 .topbar { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
@@ -39,7 +39,7 @@ button { color: inherit; }
 h1, h2, p { margin-top: 0; }
 .hero h1 { margin-bottom: 12px; font-size: clamp(30px, 6vw, 54px); line-height: 1.1; letter-spacing: -.04em; }
 .hero-copy, .settings-intro { color: var(--muted); line-height: 1.8; }
-.hero-orbit { position: absolute; right: 8%; width: 150px; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgba(185,255,79,.35); border-radius: 50%; }
+.hero-orbit { position: absolute; right: 8%; width: 150px; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgba(185,255,79,.35); border-radius: 50%; pointer-events: none; }
 .hero-orbit::before, .hero-orbit::after { content: ""; position: absolute; border: 1px solid rgba(123,220,255,.15); border-radius: 50%; inset: -35px; }
 .hero-orbit::after { inset: 30px; background: rgba(185,255,79,.08); }
 .hero-orbit span { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: var(--accent); top: 4px; box-shadow: 0 0 30px var(--accent); }
@@ -55,7 +55,7 @@ h1, h2, p { margin-top: 0; }
 .countdown { min-width: 100px; color: var(--accent); font-weight: 800; text-align: right; }
 .section-heading { margin: 48px 0 18px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
 .section-heading h1, .section-heading h2 { margin: 0; font-size: 28px; letter-spacing: -.03em; }
-.text-button { padding: 8px 0; border: 0; border-bottom: 1px solid var(--accent); background: none; color: var(--accent); cursor: pointer; font-size: 13px; }
+.text-button { min-height: 44px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--accent); background: none; color: var(--accent); cursor: pointer; font-size: 13px; }
 .schedule-list { border-top: 1px solid var(--line); }
 .schedule-row { display: grid; grid-template-columns: 82px 1fr auto; gap: 22px; align-items: center; min-height: 92px; padding: 18px 8px; border-bottom: 1px solid var(--line); }
 .schedule-time strong { font-size: 20px; }
@@ -63,7 +63,7 @@ h1, h2, p { margin-top: 0; }
 .schedule-info h3 { margin: 0 0 8px; font-size: 15px; }
 .schedule-info p { margin: 0; color: var(--muted); font-size: 12px; }
 .schedule-actions { display: flex; gap: 8px; }
-.mini-button { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: transparent; cursor: pointer; color: var(--muted); font-size: 11px; }
+.mini-button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; cursor: pointer; color: var(--muted); font-size: 11px; }
 .lineup-heading, .settings-heading { margin-top: 4px; align-items: center; }
 .lineup-heading h1, .settings-heading h1 { font-size: clamp(34px, 7vw, 56px); }
 .count-pill, .privacy-badge { padding: 8px 12px; border-radius: 999px; background: rgba(185,255,79,.12); color: var(--accent); font-size: 12px; font-weight: 700; }
@@ -75,16 +75,19 @@ h1, h2, p { margin-top: 0; }
 .filter-chip.active { background: var(--text); color: var(--bg); }
 .lineup-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .anime-card { position: relative; min-height: 250px; display: flex; flex-direction: column; justify-content: end; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
-.anime-art { position: absolute; inset: 0; background-position: center; background-size: cover; transition: transform .35s ease; }
+.anime-art { position: absolute; inset: 0; background-position: center; background-size: cover; transition: transform .35s ease; pointer-events: none; }
 .anime-card:hover .anime-art { transform: scale(1.025); }
 .anime-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 25%, rgba(8,13,26,.45) 50%, #080d1a 92%); }
 .anime-content { z-index: 1; padding: 18px; }
 .anime-content h3 { margin: 0 42px 8px 0; font-size: 16px; line-height: 1.45; }
 .anime-content p { margin: 0 0 14px; color: #c2c8d6; font-size: 11px; }
-.favorite-button { position: absolute; z-index: 2; top: 12px; right: 12px; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(8,13,26,.72); cursor: pointer; backdrop-filter: blur(8px); }
+.favorite-button { position: absolute; z-index: 2; top: 10px; right: 10px; width: 46px; height: 46px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(8,13,26,.78); cursor: pointer; backdrop-filter: blur(8px); }
 .favorite-button.active { color: #0b1020; background: var(--accent); border-color: var(--accent); }
 .card-actions { display: flex; gap: 7px; }
-.card-actions button, .card-actions a { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.04); color: var(--text); text-align: center; text-decoration: none; cursor: pointer; font-size: 10px; }
+.card-actions button, .card-actions a { min-height: 44px; display: grid; place-items: center; flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.04); color: var(--text); text-align: center; text-decoration: none; cursor: pointer; font-size: 11px; }
+.lineup-pagination { margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 16px; }
+.lineup-pagination .mini-button:disabled { opacity: .35; cursor: default; }
+.page-indicator { color: var(--muted); font-size: 12px; font-weight: 700; }
 .settings-intro { max-width: 650px; margin-bottom: 24px; }
 .settings-card { margin-bottom: 14px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .field-label, .field-heading { display: block; margin-bottom: 12px; font-size: 13px; font-weight: 750; }
@@ -94,18 +97,22 @@ select, dialog input { width: 100%; height: 48px; padding: 0 13px; border: 1px s
 .check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .check-option { position: relative; }
 .check-option input { position: absolute; opacity: 0; }
-.check-option span { min-height: 43px; display: grid; place-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); cursor: pointer; text-align: center; font-size: 11px; }
+.check-option span { min-height: 48px; display: grid; place-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); cursor: pointer; text-align: center; font-size: 11px; }
 .check-option input:checked + span { border-color: var(--accent); background: rgba(185,255,79,.1); color: var(--accent); }
 .calendar-card { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 18px; }
 .calendar-icon { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 15px; background: var(--accent); color: #111; font-size: 18px; font-weight: 900; }
 .calendar-card h2 { margin: 0 0 6px; font-size: 16px; }
 .calendar-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.calendar-status { margin-top: 8px !important; color: var(--accent) !important; font-weight: 700; }
 .primary-button, .danger-button { min-height: 44px; padding: 0 17px; border: 0; border-radius: 12px; background: var(--accent); color: #0b1020; cursor: pointer; font-weight: 800; font-size: 12px; }
 .danger-button { background: rgba(255,128,150,.12); color: var(--danger); }
+.subscription-card { grid-template-columns: 50px 1fr; }
+.subscription-card .subscription-actions { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
+.subscription-url { margin-top: 10px !important; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); color: var(--accent-2); font-size: 11px; word-break: break-all; }
 .data-note { margin: 20px 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .data-note summary { cursor: pointer; color: var(--text); }
-.bottom-nav { position: fixed; z-index: 20; left: 50%; bottom: 18px; width: min(calc(100% - 32px), 440px); height: 68px; display: flex; align-items: center; justify-content: space-around; transform: translateX(-50%); border: 1px solid var(--line); border-radius: 22px; background: rgba(12,18,33,.9); box-shadow: 0 16px 50px rgba(0,0,0,.35); backdrop-filter: blur(18px); }
-.bottom-nav a { min-width: 74px; display: grid; gap: 4px; justify-items: center; color: var(--muted); text-decoration: none; font-size: 10px; }
+.bottom-nav { position: fixed; z-index: 20; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 440px); height: 68px; display: flex; align-items: center; justify-content: space-around; transform: translateX(-50%); border: 1px solid var(--line); border-radius: 22px; background: rgba(12,18,33,.9); box-shadow: 0 16px 50px rgba(0,0,0,.35); backdrop-filter: blur(18px); }
+.bottom-nav a { min-width: 74px; min-height: 52px; display: grid; gap: 4px; place-content: center; justify-items: center; color: var(--muted); text-decoration: none; font-size: 10px; }
 .bottom-nav a span { font-size: 18px; }
 .bottom-nav a.active { color: var(--accent); }
 dialog { width: min(calc(100% - 32px), 480px); padding: 28px; border: 1px solid var(--line); border-radius: 24px; background: #11182a; color: var(--text); box-shadow: 0 30px 100px rgba(0,0,0,.7); }
@@ -120,7 +127,7 @@ dialog .field-label { margin-top: 18px; }
 .skeleton { min-height: 92px; margin: 10px 0; border-radius: 18px; background: linear-gradient(90deg, var(--panel), var(--panel-2), var(--panel)); background-size: 200%; animation: shimmer 1.2s infinite; }
 @keyframes shimmer { to { background-position: -200%; } }
 @media (max-width: 720px) {
-  .app-shell { padding: 0 16px 104px; }
+  .app-shell { padding: 0 16px calc(104px + env(safe-area-inset-bottom)); }
   .topbar { height: 70px; }
   .hero { min-height: 205px; padding: 30px 24px; }
   .hero-orbit { right: -50px; opacity: .55; }

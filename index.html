@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1020" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ミルヨテ" />
     <meta name="description" content="自分の視聴環境に合わせて今期アニメを追いかける、個人用アニメナビ。" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
@@ -54,6 +57,7 @@
             <button class="filter-chip" type="button" data-filter="airing">放送中</button>
           </div>
           <div id="lineupGrid" class="lineup-grid" aria-live="polite"></div>
+          <div id="lineupPagination" class="lineup-pagination" aria-live="polite"></div>
         </section>
 
         <section id="settingsView" class="view" aria-labelledby="settingsTitle">
@@ -85,8 +89,24 @@
 
           <div class="settings-card calendar-card">
             <div><span class="calendar-icon" aria-hidden="true">17</span></div>
-            <div><h2>端末のカレンダーで通知</h2><p>「観たい」にした作品の次回予定を、10分前アラーム付きICSに書き出します。</p></div>
-            <button id="exportCalendarSettings" class="primary-button" type="button">ICSを書き出す</button>
+            <div><h2>端末のカレンダーで通知</h2>
+              <p>「観たい」にした作品の次回予定を、10分前アラーム付きでiPhoneへ渡します。共有画面が出たら「ファイルに保存」し、そのICSを開いて登録してください。</p>
+              <p id="calendarStatus" class="calendar-status" aria-live="polite"></p>
+            </div>
+            <button id="exportCalendarSettings" class="primary-button" type="button">カレンダーへ渡す</button>
+          </div>
+
+          <div class="settings-card calendar-card subscription-card">
+            <div><span class="calendar-icon" aria-hidden="true">⟳</span></div>
+            <div>
+              <h2>PCから更新する購読カレンダー</h2>
+              <p>これは上級者向けです。<code>calendar.ics</code> を作ってGitHubへpushした場合だけ、下の購読URLが使えます。iPhoneだけで登録する場合は、上の「カレンダーへ渡す」を使ってください。</p>
+              <p class="subscription-url" id="subscriptionUrlDisplay"></p>
+            </div>
+            <div class="subscription-actions">
+              <button id="exportSubscriptionFeed" class="primary-button" type="button">calendar.icsを作る</button>
+              <button id="copySubscriptionUrl" class="mini-button" type="button">購読URLをコピー</button>
+            </div>
           </div>
 
           <details class="data-note">
@@ -105,7 +125,7 @@
 
     <dialog id="overrideDialog">
       <form id="overrideForm" method="dialog">
-        <button class="dialog-close" value="cancel" aria-label="閉じる">×</button>
+        <button id="overrideClose" class="dialog-close" type="button" aria-label="閉じる">×</button>
         <p class="eyebrow">MANUAL CORRECTION</p>
         <h2 id="overrideTitle">自分用予定を補正</h2>
         <p class="dialog-copy">公式サイトで確認した最速時刻を、この端末だけに保存します。</p>
@@ -116,7 +136,7 @@
         <input id="overrideDateTime" type="datetime-local" required />
         <div class="dialog-actions">
           <button id="deleteOverride" class="danger-button" type="button">補正を削除</button>
-          <button class="primary-button" value="save">保存する</button>
+          <button class="primary-button" type="submit">保存する</button>
         </div>
       </form>
     </dialog>

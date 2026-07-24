@@ -9,6 +9,8 @@ const fallbackAnime = [
 
 let anime = [];
 let activeFilter = "all";
+let lineupPage = 1;
+const LINEUP_PAGE_SIZE = 50;
 let state = loadState();
 
 function loadState() {
@@ -95,25 +97,44 @@ function renderLineup() {
     if (activeFilter === "airing" && item.status !== "RELEASING") return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LINEUP_PAGE_SIZE));
+  if (lineupPage > totalPages) lineupPage = totalPages;
+  if (lineupPage < 1) lineupPage = 1;
+  const start = (lineupPage - 1) * LINEUP_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + LINEUP_PAGE_SIZE);
+
   document.querySelector("#lineupCount").textContent = `${filtered.length}作品`;
-  document.querySelector("#lineupGrid").innerHTML = filtered.length ? filtered.map(item => {
+  document.querySelector("#lineupGrid").innerHTML = pageItems.length ? pageItems.map(item => {
     const schedule = scheduleOf(item);
     const favorite = state.favorites.includes(item.id);
     const bg = item.coverImage?.large ? `style="background-image:url('${item.coverImage.large.replaceAll("'", "%27")}')"` : "";
     return `<article class="anime-card">
       <div class="anime-art" ${bg}></div>
-      <button class="favorite-button ${favorite ? "active" : ""}" data-action="favorite" data-id="${item.id}" aria-label="${favorite ? "観たいから外す" : "観たいに追加"}">${favorite ? "★" : "☆"}</button>
+      <button class="favorite-button ${favorite ? "active" : ""}" data-action="favorite" data-id="${item.id}" aria-label="${favorite ? "観たいから外す" : "観たいに追加"}" aria-pressed="${favorite}">${favorite ? "★" : "☆"}</button>
       <div class="anime-content"><h3>${escapeHtml(titleOf(item))}</h3><p>${schedule ? `${formatDay(schedule.at)} ${formatTime(schedule.at)} · 第${schedule.episode || "?"}話` : "次回予定 未発表"}</p>
         <div class="card-actions"><button data-action="override" data-id="${item.id}">${state.overrides[item.id] ? "時刻を再補正" : "時刻を補正"}</button><a href="${item.siteUrl || "https://anilist.co"}" target="_blank" rel="noopener">出典</a></div>
       </div>
     </article>`;
   }).join("") : `<div class="empty-state">条件に合う作品がありません。</div>`;
+
+  const paginationNode = document.querySelector("#lineupPagination");
+  if (paginationNode) {
+    paginationNode.innerHTML = totalPages > 1 ? `
+      <button class="mini-button" type="button" data-page-action="prev" ${lineupPage <= 1 ? "disabled" : ""}>← 前の50件</button>
+      <span class="page-indicator">${lineupPage} / ${totalPages} ページ</span>
+      <button class="mini-button" type="button" data-page-action="next" ${lineupPage >= totalPages ? "disabled" : ""}>次の50件 →</button>
+    ` : "";
+  }
 }
 
 function renderSettings() {
   document.querySelector("#prefectureSelect").value = state.prefecture;
   renderChecks("#channelOptions", channels, state.channels, "channel");
   renderChecks("#serviceOptions", services, state.services, "service");
+  const urlNode = document.querySelector("#subscriptionUrlDisplay");
+  if (urlNode) urlNode.textContent = `購読URL: webcal://${location.host}${location.pathname.replace(/index\.html$/, "")}calendar.ics`;
+  const calendarStatus = document.querySelector("#calendarStatus");
+  if (calendarStatus) calendarStatus.textContent = state.favorites.length ? `現在「観たい」${state.favorites.length}作品` : "先に「今期」で観たい作品へ★を付けてください";
 }
 
 function renderChecks(selector, values, selected, name) {
@@ -131,12 +152,25 @@ async function fetchAnime(force = false) {
     } catch {}
   }
   if (!anime.length || force) {
-    const query = `query { Page(page: 1, perPage: 50) { media(type: ANIME, season: SUMMER, seasonYear: 2026, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
+    const query = `query ($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(type: ANIME, season: SUMMER, seasonYear: 2026, countryOfOrigin: "JP", sort: [START_DATE, POPULARITY_DESC], isAdult: false) { id title { native romaji english } coverImage { large } status episodes siteUrl nextAiringEpisode { episode airingAt } } } }`;
+    const TARGET_TOTAL = 200;
+    const PER_PAGE = 50;
     try {
-      const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query }) });
-      if (!response.ok) throw new Error(`API ${response.status}`);
-      const json = await response.json();
-      anime = json.data.Page.media;
+      const collected = [];
+      let page = 1;
+      let hasNextPage = true;
+      while (hasNextPage && collected.length < TARGET_TOTAL) {
+        const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query, variables: { page, perPage: PER_PAGE } }) });
+        if (!response.ok) throw new Error(`API ${response.status}`);
+        const json = await response.json();
+        collected.push(...json.data.Page.media);
+        anime = collected.slice(0, TARGET_TOTAL);
+        if (page === 1) renderAll();
+        hasNextPage = json.data.Page.pageInfo?.hasNextPage;
+        page += 1;
+        if (hasNextPage && collected.length < TARGET_TOTAL) await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      anime = collected.slice(0, TARGET_TOTAL);
       localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items: anime }));
       if (force) showToast("番組情報を更新しました");
     } catch (error) {
@@ -161,7 +195,15 @@ function openOverride(id) {
   const base = existing ? new Date(existing.startAt) : scheduleOf(item)?.at;
   document.querySelector("#overrideDateTime").value = base ? localInputValue(base) : "";
   document.querySelector("#deleteOverride").hidden = !existing;
-  document.querySelector("#overrideDialog").showModal();
+  const dialog = document.querySelector("#overrideDialog");
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  else dialog.setAttribute("open", "");
+}
+
+function closeOverride() {
+  const dialog = document.querySelector("#overrideDialog");
+  if (typeof dialog.close === "function") dialog.close();
+  else dialog.removeAttribute("open");
 }
 
 function localInputValue(date) {
@@ -183,16 +225,80 @@ function saveOverride() {
 function escapeICS(value) { return String(value).replaceAll("\\", "\\\\").replaceAll(";", "\\;").replaceAll(",", "\\,").replaceAll("\n", "\\n"); }
 function icsDate(date) { return date.toISOString().replaceAll("-", "").replaceAll(":", "").replace(/\.\d{3}/, ""); }
 
-function exportICS(items = upcomingItems(true)) {
-  if (!items.length) { showToast("先に観たい作品を登録してください"); return; }
+function buildICSContent(items) {
   const events = items.map(({ item, schedule }) => {
     const end = new Date(schedule.at.getTime() + 30 * 60 * 1000);
     return ["BEGIN:VEVENT", `UID:miruyote-${item.id}-${schedule.episode || 0}@local`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(schedule.at)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${escapeICS(`${titleOf(item)} 第${schedule.episode || "?"}話`)}`, `DESCRIPTION:${escapeICS(`${schedule.provider} / ${schedule.confirmed ? "自分用確認済み" : "AniList参考時刻。公式情報も確認してください。"}`)}`, "BEGIN:VALARM", "TRIGGER:-PT10M", "ACTION:DISPLAY", `DESCRIPTION:${escapeICS(`${titleOf(item)} まもなく開始`)}`, "END:VALARM", "END:VEVENT"].join("\r\n");
   }).join("\r\n");
-  const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Miruyote//Anime Schedule//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", events, "END:VCALENDAR"].join("\r\n");
-  const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "miruyote.ics"; link.click(); URL.revokeObjectURL(link.href);
-  showToast(`${items.length}件の予定を書き出しました`);
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Miruyote//Anime Schedule//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:ミルヨテ", "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H", events, "END:VCALENDAR"].join("\r\n");
+}
+
+function downloadICSFile(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+async function exportICS(items = upcomingItems(true), filename = "miruyote.ics") {
+  if (!items.length) {
+    showToast("先に今期一覧で観たい作品へ★を付けてください");
+    location.hash = "lineup";
+    return;
+  }
+  const content = buildICSContent(items);
+  const file = new File([content], filename, { type: "text/calendar" });
+  const shareData = { title: "ミルヨテのアニメ予定", files: [file] };
+  if (navigator.share && navigator.canShare?.(shareData)) {
+    try {
+      await navigator.share(shareData);
+      showToast(`${items.length}件の予定をiPhoneへ渡しました`);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        showToast("共有をキャンセルしました");
+        return;
+      }
+    }
+  }
+  downloadICSFile(file);
+  showToast(`${items.length}件のICSを保存しました。ファイルを開いて登録してください`);
+}
+
+async function exportSubscriptionFeed() {
+  const items = upcomingItems(true);
+  if (!items.length) {
+    showToast("先に今期一覧で観たい作品へ★を付けてください");
+    location.hash = "lineup";
+    return;
+  }
+  await exportICS(items, "calendar.ics");
+}
+
+async function copySubscriptionUrl() {
+  const url = `webcal://${location.host}${location.pathname.replace(/index\.html$/, "")}calendar.ics`;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+    await navigator.clipboard.writeText(url);
+    showToast("購読URLをコピーしました");
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = url;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    const copied = document.execCommand("copy");
+    field.remove();
+    showToast(copied ? "購読URLをコピーしました" : url);
+  }
 }
 
 function showToast(message) {
@@ -208,25 +314,40 @@ function navigate() {
 }
 
 document.addEventListener("click", event => {
-  const action = event.target.closest("[data-action]")?.dataset.action;
-  const id = Number(event.target.closest("[data-id]")?.dataset.id);
+  const target = event.target instanceof Element ? event.target : null;
+  const action = target?.closest("[data-action]")?.dataset.action;
+  const id = Number(target?.closest("[data-id]")?.dataset.id);
   if (action === "favorite") toggleFavorite(id);
   if (action === "override") openOverride(id);
   if (action === "single-ics") { const item = anime.find(value => value.id === id); if (item && scheduleOf(item)) exportICS([{ item, schedule: scheduleOf(item) }]); }
 });
-document.querySelector("#searchInput").addEventListener("input", renderLineup);
-document.querySelectorAll(".filter-chip").forEach(button => button.addEventListener("click", () => { document.querySelectorAll(".filter-chip").forEach(node => node.classList.remove("active")); button.classList.add("active"); activeFilter = button.dataset.filter; renderLineup(); }));
+document.querySelector("#searchInput").addEventListener("input", () => { lineupPage = 1; renderLineup(); });
+document.querySelectorAll(".filter-chip").forEach(button => button.addEventListener("click", () => { document.querySelectorAll(".filter-chip").forEach(node => node.classList.remove("active")); button.classList.add("active"); activeFilter = button.dataset.filter; lineupPage = 1; renderLineup(); }));
+document.querySelector("#lineupView").addEventListener("click", event => {
+  const target = event.target instanceof Element ? event.target : null;
+  const pageAction = target?.closest("[data-page-action]")?.dataset.pageAction;
+  if (!pageAction) return;
+  lineupPage += pageAction === "next" ? 1 : -1;
+  renderLineup();
+  document.querySelector("#lineupView").scrollIntoView({ block: "start" });
+});
 document.querySelector("#prefectureSelect").addEventListener("change", event => { state.prefecture = event.target.value; saveState(); showToast("都道府県を保存しました"); });
 document.querySelector("#settingsView").addEventListener("change", event => {
   if (!event.target.matches("input[type=checkbox]")) return;
   const key = event.target.name === "channel" ? "channels" : "services";
   state[key] = [...document.querySelectorAll(`input[name=${event.target.name}]:checked`)].map(node => node.value); saveState();
 });
-document.querySelector("#overrideForm").addEventListener("submit", event => { if (event.submitter?.value === "save" && !saveOverride()) event.preventDefault(); });
-document.querySelector("#deleteOverride").addEventListener("click", () => { const id = Number(document.querySelector("#overrideAnimeId").value); delete state.overrides[id]; saveState(); document.querySelector("#overrideDialog").close(); renderAll(); showToast("補正を削除しました"); });
+document.querySelector("#overrideForm").addEventListener("submit", event => {
+  event.preventDefault();
+  if (saveOverride()) closeOverride();
+});
+document.querySelector("#overrideClose").addEventListener("click", closeOverride);
+document.querySelector("#deleteOverride").addEventListener("click", () => { const id = Number(document.querySelector("#overrideAnimeId").value); delete state.overrides[id]; saveState(); closeOverride(); renderAll(); showToast("補正を削除しました"); });
 document.querySelector("#refreshButton").addEventListener("click", () => fetchAnime(true));
 document.querySelector("#exportCalendarTop").addEventListener("click", () => exportICS());
 document.querySelector("#exportCalendarSettings").addEventListener("click", () => exportICS());
+document.querySelector("#exportSubscriptionFeed")?.addEventListener("click", exportSubscriptionFeed);
+document.querySelector("#copySubscriptionUrl")?.addEventListener("click", copySubscriptionUrl);
 window.addEventListener("hashchange", navigate);
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
