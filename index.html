@@ -37,28 +37,32 @@
 
           <div class="section-heading">
             <div><p class="eyebrow">UP NEXT</p><h2>これからの予定</h2></div>
-            <button id="exportCalendarTop" class="text-button" type="button">カレンダーに追加</button>
+            <div class="calendar-quick-actions">
+              <button id="exportCalendarTop" class="text-button" type="button">カレンダーへまとめて追加</button>
+              <button id="openCalendarHelpTop" class="mini-button" type="button">開けないとき</button>
+            </div>
           </div>
-          <div id="scheduleList" class="schedule-list" aria-live="polite"></div>
+          <div id="scheduleList" class="schedule-list"></div>
         </section>
 
         <section id="lineupView" class="view" aria-labelledby="lineupTitle">
           <div class="section-heading lineup-heading">
-            <div><p class="eyebrow" id="seasonLabel">CURRENT SEASON</p><h1 id="lineupTitle">今期ラインナップ</h1></div>
-            <span id="lineupCount" class="count-pill">–</span>
+            <div><p class="eyebrow" id="seasonLabel">CURRENT SEASON</p><h1 id="lineupTitle" tabindex="-1">今期ラインナップ</h1></div>
+            <span id="lineupCount" class="count-pill" role="status" aria-live="polite" aria-atomic="true">–</span>
           </div>
           <label class="search-box">
             <span aria-hidden="true">⌕</span>
             <input id="searchInput" type="search" placeholder="作品名で検索" autocomplete="off" />
           </label>
           <div class="filter-row" role="group" aria-label="作品の絞り込み">
-            <button class="filter-chip active" type="button" data-filter="all">すべて</button>
-            <button class="filter-chip" type="button" data-filter="favorite">観たい</button>
-            <button class="filter-chip" type="button" data-filter="airing">放送中</button>
+            <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">すべて</button>
+            <button class="filter-chip" type="button" data-filter="favorite" aria-pressed="false">観たい</button>
+            <button class="filter-chip" type="button" data-filter="airing" aria-pressed="false">放送中</button>
           </div>
           <p class="lineup-note">★を付けた作品はこの端末に記憶され、次回から一覧の先頭に並びます。</p>
-          <div id="lineupGrid" class="lineup-grid" aria-live="polite"></div>
-          <div id="lineupPagination" class="lineup-pagination" aria-live="polite"></div>
+          <div id="lineupGrid" class="lineup-grid"></div>
+          <div id="lineupPagination" class="lineup-pagination"></div>
+          <p id="lineupPageStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
         </section>
 
         <section id="settingsView" class="view" aria-labelledby="settingsTitle">
@@ -102,17 +106,20 @@
           <div class="settings-card calendar-card">
             <div><span class="calendar-icon" aria-hidden="true">17</span></div>
             <div><h2>端末のカレンダーで通知</h2>
-              <p>「観たい」にした作品の次回予定を、10分前アラーム付きでiPhoneへ渡します。共有画面が出たら「ファイルに保存」し、そのICSを開いて登録してください。</p>
+              <p>「観たい」にした作品の次回予定を、10分前アラーム付きの1ファイルにまとめ、iPhoneのカレンダー取込画面を直接開きます。</p>
               <p id="calendarStatus" class="calendar-status" aria-live="polite"></p>
             </div>
-            <button id="exportCalendarSettings" class="primary-button" type="button">カレンダーへ渡す</button>
+            <div class="calendar-card-actions">
+              <button id="exportCalendarSettings" class="primary-button" type="button">カレンダーへ追加</button>
+              <button id="openCalendarHelpSettings" class="mini-button" type="button">開けないとき</button>
+            </div>
           </div>
 
           <div class="settings-card calendar-card subscription-card">
             <div><span class="calendar-icon" aria-hidden="true">⟳</span></div>
             <div>
               <h2>PCから更新する購読カレンダー</h2>
-              <p>これは上級者向けです。<code>calendar.ics</code> を作ってGitHubへpushした場合だけ、下の購読URLが使えます。iPhoneだけで登録する場合は、上の「カレンダーへ渡す」を使ってください。</p>
+              <p>これは上級者向けです。<code>calendar.ics</code> を作ってGitHubへpushした場合だけ、下の購読URLが使えます。iPhoneだけで登録する場合は、上の「カレンダーへ追加」を使ってください。</p>
               <p class="subscription-url" id="subscriptionUrlDisplay"></p>
             </div>
             <div class="subscription-actions">
@@ -135,6 +142,23 @@
       </nav>
     </div>
 
+    <dialog id="calendarGuideDialog" class="calendar-guide-dialog" aria-labelledby="calendarGuideTitle">
+      <button id="calendarGuideClose" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      <p class="eyebrow">CALENDAR FALLBACK</p>
+      <h2 id="calendarGuideTitle">直接開けないとき</h2>
+      <p class="dialog-copy">通常は「カレンダーへ追加」だけで取込画面が開きます。反応しなかった場合だけ、Apple純正の「メール」を経由してください。</p>
+      <p id="calendarGuideCount" class="calendar-guide-count" aria-live="polite"></p>
+      <ol class="calendar-guide-steps">
+        <li>下のボタンで共有画面を開き、<strong>「メール」</strong>を選ぶ</li>
+        <li>ICSを添付したまま、自分宛てに送信する</li>
+        <li>Apple純正の「メール」で添付を開き、<strong>「すべて追加」</strong>を押す</li>
+      </ol>
+      <p id="calendarGuideNote" class="calendar-guide-note">「ファイル」に保存したICSからカレンダーが開かない場合でも、このメール経由なら登録できます。</p>
+      <div class="calendar-guide-actions">
+        <button id="shareCalendarByMail" class="primary-button" type="button">共有画面を開く（メールを選ぶ）</button>
+        <button id="downloadCalendarFile" class="mini-button" type="button">ICSだけ保存</button>
+      </div>
+    </dialog>
     <dialog id="overrideDialog">
       <form id="overrideForm" method="dialog">
         <button id="overrideClose" class="dialog-close" type="button" aria-label="閉じる">×</button>
